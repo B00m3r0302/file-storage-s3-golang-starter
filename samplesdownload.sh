@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/sbin/zsh
 
 mkdir -p samples
 
