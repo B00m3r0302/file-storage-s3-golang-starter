@@ -16,7 +16,7 @@ import (
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
 	const maxMemory = 10 << 30
-	uploadLimit := http.MaxBytesReader(w, r.Body, maxMemory)
+	r.Body = http.MaxBytesReader(w, r.Body, maxMemory)
 
 	videoIDString := r.PathValue("videoID")
 	videoID, err := uuid.Parse(videoIDString)
@@ -95,12 +95,20 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	rand.Read(key)
 	id := base64.RawURLEncoding.EncodeToString(key)
 	fileName := fmt.Sprintf("%s%s", id, ext)
+	fileURL := fmt.Sprintf("https://tubely-0302.s3.us-east-1.amazonaws.com/%s", fileName)
 
 	putObjectInput := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &fileName,
 		Body:        tempFile,
 		ContentType: &mediaType,
+	}
+
+	metadata.VideoURL = &fileURL
+	err = cfg.db.UpdateVideo(metadata)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update video", nil)
+		return
 	}
 
 	_, err = cfg.s3Client.PutObject(context.Background(), &putObjectInput)
