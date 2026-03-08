@@ -90,11 +90,27 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	aspectRatio, err := getVideoAspectRatio(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get video aspect ratio", err)
+		return
+	}
+
 	ext := ".mp4"
 	key := make([]byte, 32)
+	var prefix string
 	rand.Read(key)
 	id := base64.RawURLEncoding.EncodeToString(key)
-	fileName := fmt.Sprintf("%s%s", id, ext)
+
+	if aspectRatio == "landscape" {
+		prefix = "landscape/"
+	} else if aspectRatio == "portrait" {
+		prefix = "portrait/"
+	} else {
+		prefix = "other/"
+	}
+
+	fileName := fmt.Sprintf("%s%s%s", prefix, id, ext)
 	fileURL := fmt.Sprintf("https://tubely-0302.s3.us-east-1.amazonaws.com/%s", fileName)
 
 	putObjectInput := s3.PutObjectInput{
