@@ -101,6 +101,15 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	var prefix string
 	rand.Read(key)
 	id := base64.RawURLEncoding.EncodeToString(key)
+	preProcessedFileName := fmt.Sprintf("%s%s", id, ext)
+
+	processedFile, err := processVideoForFastStart(preProcessedFileName)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't process video for fast start", err)
+		return
+	}
+
+	defer os.Remove(tempFile.Name())
 
 	if aspectRatio == "landscape" {
 		prefix = "landscape/"
@@ -116,7 +125,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	putObjectInput := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &fileName,
-		Body:        tempFile,
+		Body:        processedFile,
 		ContentType: &mediaType,
 	}
 
