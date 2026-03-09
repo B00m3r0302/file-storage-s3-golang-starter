@@ -101,13 +101,6 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	var prefix string
 	rand.Read(key)
 	id := base64.RawURLEncoding.EncodeToString(key)
-	preProcessedFileName := fmt.Sprintf("%s%s", id, ext)
-
-	processedFile, err := processVideoForFastStart(preProcessedFileName)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't process video for fast start", err)
-		return
-	}
 
 	defer os.Remove(tempFile.Name())
 
@@ -120,13 +113,32 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 
 	fileName := fmt.Sprintf("%s%s%s", prefix, id, ext)
+	newFileName, err := processVideoForFastStart(tempFile.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't process video", err)
+		return
+	}
+	newBody, err := os.Open(newFileName)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't open new file", err)
+		return
+	}
+
+	defer newBody.Close()
+	defer os.Remove(newFileName)
+
 	fileURL := fmt.Sprintf("https://tubely-0302.s3.us-east-1.amazonaws.com/%s", fileName)
 
 	putObjectInput := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
 		Key:         &fileName,
-		Body:        processedFile,
+		Body:        newBody,
 		ContentType: &mediaType,
+	}
+
+	_, err = cfg.s3Client.PutObject(context.Background(), &putObjectInput)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't upload file to S3", err)
 	}
 
 	metadata.VideoURL = &fileURL
@@ -135,10 +147,4 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update video", nil)
 		return
 	}
-
-	_, err = cfg.s3Client.PutObject(context.Background(), &putObjectInput)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't upload file to S3", err)
-	}
-
 }
