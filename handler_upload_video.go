@@ -127,7 +127,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	defer newBody.Close()
 	defer os.Remove(newFileName)
 
-	fileURL := fmt.Sprintf("https://tubely-0302.s3.us-east-1.amazonaws.com/%s", fileName)
+	// fileURL := fmt.Sprintf("https://tubely-0302.s3.us-east-1.amazonaws.com/%s", fileName)
 
 	putObjectInput := s3.PutObjectInput{
 		Bucket:      &cfg.s3Bucket,
@@ -141,8 +141,11 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't upload file to S3", err)
 	}
 
-	metadata.VideoURL = &fileURL
+	videoURL := fmt.Sprintf("%s,%s", &cfg.s3Bucket, &fileName)
+	metadata.VideoURL = &videoURL
 	err = cfg.db.UpdateVideo(metadata)
+	// metadata.VideoURL = &fileURL
+	// err = cfg.db.UpdateVideo(metadata)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update video", nil)
 		return
